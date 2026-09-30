@@ -1,6 +1,6 @@
-FROM ghcr.io/home-assistant/base:latest
+FROM python:3.13-alpine
 
-RUN apk --no-cache add python3 py3-aiohttp
+RUN pip install --no-cache-dir aiohttp
 
 WORKDIR /app
 COPY server.py /app/server.py
