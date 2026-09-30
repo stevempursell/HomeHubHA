@@ -1,4 +1,3 @@
-\
 import os
 from pathlib import Path
 from aiohttp import web, ClientSession, ClientTimeout
@@ -29,6 +28,7 @@ async def call_service(request):
     domain = request.match_info["domain"]
     service = request.match_info["service"]
     payload = await request.json()
+
     async with ClientSession(timeout=ClientTimeout(total=15)) as session:
         async with session.post(
             f"{HA_API}/services/{domain}/{service}",
