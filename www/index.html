@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Home Hub</title>
+  <link rel="stylesheet" href="static/styles.css" />
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <div class="eyebrow">LOCAL CONTROL</div>
+        <h1>Home Hub</h1>
+      </div>
+      <div id="status" class="status">Connecting…</div>
+    </header>
+
+    <section class="summary">
+      <div class="metric"><span id="entityCount">—</span><small>entities</small></div>
+      <div class="metric"><span id="lightCount">—</span><small>lights on</small></div>
+      <div class="metric"><span id="openCount">—</span><small>open sensors</small></div>
+    </section>
+
+    <section>
+      <div class="section-title">
+        <h2>Lights & switches</h2>
+        <button id="refresh">Refresh</button>
+      </div>
+      <div id="controls" class="grid"></div>
+    </section>
+
+    <section>
+      <div class="section-title">
+        <h2>Entity browser</h2>
+        <input id="search" placeholder="Search entity or friendly name…" />
+      </div>
+      <div id="entities" class="entity-list"></div>
+    </section>
+  </main>
+
+  <script src="static/app.js"></script>
+</body>
+</html>
