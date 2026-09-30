@@ -10,7 +10,7 @@ WWW = Path("/app/www")
 
 def ha_headers():
     return {
-        "Authorization": `Bearer ${TOKEN}`,
+        "Authorization": f"Bearer {TOKEN}",
         "Content-Type": "application/json",
     }
 
