@@ -1,4 +1,6 @@
-[hidden] { display: none !important; }\n\n:root {
+[hidden] { display: none !important; }
+
+:root {
   color-scheme: dark;
   --bg: #0b0d10;
   --panel: #15191f;
