@@ -162,10 +162,7 @@ function renderFloorplan() {
     layer.appendChild(button);
   }
 
-  const totalLights = states.filter(s => s.entity_id.startsWith("light.")).length;
-  const onLights = states.filter(s => s.entity_id.startsWith("light.") && s.state === "on").length;
-  $("lightCount").textContent = onLights;
-  $("lightTotal").textContent = totalLights;
+  renderAlarmPanel();
   renderSelectedRoom();
 }
 
@@ -269,6 +266,70 @@ function renderUnmappedAreas() {
   }
   holder.innerHTML = '<span class="muted-label">Unmapped HA areas:</span> ' +
     unmapped.map(a => `<span class="area-chip">${a.name}</span>`).join(" ");
+}
+
+function alarmEntity() {
+  return states.find(entity => entity.entity_id.startsWith("alarm_control_panel.")) || null;
+}
+
+function prettyAlarmState(state) {
+  const labels = {
+    disarmed: "Off",
+    armed_home: "Armed Home",
+    armed_away: "Armed Away",
+    armed_night: "Armed Night",
+    armed_vacation: "Armed Vacation",
+    arming: "Arming…",
+    disarming: "Disarming…",
+    pending: "Pending…",
+    triggered: "TRIGGERED",
+    unavailable: "Unavailable",
+    unknown: "Unknown",
+  };
+  return labels[state] || state.replaceAll("_", " ");
+}
+
+function renderAlarmPanel() {
+  const alarm = alarmEntity();
+  const name = $("alarmName");
+  const state = $("alarmState");
+  const home = $("armHome");
+  const off = $("armOff");
+  if (!name || !state || !home || !off) return;
+
+  if (!alarm) {
+    name.textContent = "No alarm panel found";
+    state.textContent = "Add an alarm_control_panel entity in Home Assistant";
+    home.disabled = true;
+    off.disabled = true;
+    return;
+  }
+
+  name.textContent = friendly(alarm);
+  state.textContent = prettyAlarmState(alarm.state);
+  state.dataset.state = alarm.state;
+
+  const busy = ["arming", "disarming", "pending"].includes(alarm.state);
+  home.disabled = busy || alarm.state === "armed_home" || alarm.state === "unavailable";
+  off.disabled = busy || alarm.state === "disarmed" || alarm.state === "unavailable";
+}
+
+async function callAlarm(service) {
+  const alarm = alarmEntity();
+  if (!alarm) throw new Error("No alarm panel found");
+
+  const response = await fetch(`service/alarm_control_panel/${service}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ entity_id: alarm.entity_id }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Alarm service failed: ${response.status}${detail ? " • " + detail : ""}`);
+  }
+
+  await loadStates(false);
 }
 
 function renderEntityBrowser() {
@@ -389,7 +450,6 @@ async function loadStates(updateStatus = true) {
   const response = await fetch("api/states");
   if (!response.ok) throw new Error(`HA API returned ${response.status}`);
   states = await response.json();
-  $("entityCount").textContent = states.length;
   buildRoomModel();
   renderFloorplan();
   renderEntityBrowser();
@@ -417,6 +477,8 @@ $("managerRoom").addEventListener("change", renderManager);
 $("managerSearch").addEventListener("input", renderManager);
 $("managerDomain").addEventListener("change", renderManager);
 $("saveMappings").addEventListener("click", () => saveMappings().catch(showError));
+$("armHome").addEventListener("click", () => callAlarm("alarm_arm_home").catch(showError));
+$("armOff").addEventListener("click", () => callAlarm("alarm_disarm").catch(showError));
 
 init();
 setInterval(() => loadStates(false).catch(showError), 5000);
