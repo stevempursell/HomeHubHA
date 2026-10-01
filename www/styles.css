@@ -357,3 +357,81 @@ summary:focus-visible {
     font-size: 8px;
   }
 }
+
+
+.manager-panel {
+  margin-top: 14px;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+
+.manager-toolbar {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(180px, 1fr) minmax(150px, 220px);
+  gap: 10px;
+  margin: 14px 0 10px;
+}
+
+.manager-toolbar select,
+.manager-toolbar input,
+#saveMappings {
+  min-height: 44px;
+  background: var(--panel2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 10px 12px;
+  font-size: 16px;
+}
+
+.manager-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.manager-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: #10141a;
+}
+
+.manager-row input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+}
+
+.manager-entity strong,
+.manager-entity small {
+  display: block;
+}
+
+.manager-entity small,
+.mapping-source {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mapping-source {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 7px;
+}
+
+@media (max-width: 640px) {
+  .manager-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  #saveMappings {
+    width: 100%;
+  }
+}
