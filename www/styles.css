@@ -435,3 +435,82 @@ summary:focus-visible {
     width: 100%;
   }
 }
+
+
+.alarm-card {
+  margin: 20px 0;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+
+.alarm-info {
+  min-width: 0;
+}
+
+.alarm-name {
+  margin-top: 4px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.alarm-state {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.alarm-state[data-state="armed_home"] {
+  color: var(--on);
+}
+
+.alarm-state[data-state="triggered"] {
+  color: #ff8f8f;
+  font-weight: 700;
+}
+
+.alarm-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.alarm-action {
+  min-height: 46px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel2);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.alarm-action:disabled {
+  opacity: .45;
+}
+
+.alarm-off {
+  background: #11161c;
+}
+
+@media (max-width: 640px) {
+  .alarm-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .alarm-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .alarm-action {
+    width: 100%;
+  }
+}
