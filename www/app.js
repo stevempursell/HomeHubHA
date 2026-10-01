@@ -9,7 +9,7 @@ const ROOM_DEFS = [
   { id: "patio", label: "Covered Patio", aliases: ["covered patio", "patio", "back patio"], x: 3, y: 1, w: 51, h: 9 },
   { id: "primary", label: "Primary Bedroom", aliases: ["master bedroom", "primary bedroom", "primary", "master"], x: 55, y: 3, w: 41, h: 15 },
   { id: "great", label: "Great Room", aliases: ["great room", "living room", "family room"], x: 3, y: 10, w: 51, h: 14 },
-  { id: "nook", label: "Nook", aliases: ["nook", "dining", "dining room"], x: 3, y: 24, w: 38, h: 12 },
+  { id: "nook", label: "Dining Room", aliases: ["nook", "dining", "dining room"], x: 3, y: 24, w: 38, h: 12 },
   { id: "kitchen", label: "Kitchen", aliases: ["kitchen"], x: 41, y: 24, w: 23, h: 15 },
   { id: "foyer", label: "Foyer", aliases: ["foyer", "entry", "entryway"], x: 3, y: 36, w: 34, h: 10 },
   { id: "study", label: "Open Study", aliases: ["open study", "study", "office"], x: 20, y: 43, w: 30, h: 13 },
@@ -21,7 +21,7 @@ const ROOM_DEFS = [
 
 const LIGHT_RULES = {
   great: ["living room", "fan light", "ceiling fan light"],
-  nook: ["island"],
+  nook: ["dining", "dining room", "nook"],
   kitchen: ["kitchen", "big light", "big lights", "island", "cabinet", "cabinets"],
   bed2: ["bennett"],
   bed3: ["parker"],
