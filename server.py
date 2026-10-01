@@ -7,6 +7,8 @@ HA_API = "http://supervisor/core/api"
 HA_WS = "ws://supervisor/core/websocket"
 TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 WWW = Path("/app/www")
+DATA = Path("/data")
+MAPPINGS_FILE = DATA / "room_mappings.json"
 
 def ha_headers():
     return {
@@ -76,12 +78,42 @@ async def registry(request):
                 "entities": results[3]["result"],
             })
 
+async def get_mappings(request):
+    DATA.mkdir(parents=True, exist_ok=True)
+    if not MAPPINGS_FILE.exists():
+        return web.json_response({"entity_rooms": {}})
+    try:
+        import json
+        return web.json_response(json.loads(MAPPINGS_FILE.read_text()))
+    except Exception as err:
+        return web.json_response({"error": f"Could not read mappings: {err}"}, status=500)
+
+async def save_mappings(request):
+    DATA.mkdir(parents=True, exist_ok=True)
+    try:
+        import json
+        payload = await request.json()
+        entity_rooms = payload.get("entity_rooms", {})
+        if not isinstance(entity_rooms, dict):
+            raise ValueError("entity_rooms must be an object")
+        clean = {}
+        for entity_id, room_ids in entity_rooms.items():
+            if not isinstance(entity_id, str) or not isinstance(room_ids, list):
+                continue
+            clean[entity_id] = [str(room_id) for room_id in room_ids]
+        MAPPINGS_FILE.write_text(json.dumps({"entity_rooms": clean}, indent=2, sort_keys=True))
+        return web.json_response({"ok": True, "entity_rooms": clean})
+    except Exception as err:
+        return web.json_response({"error": f"Could not save mappings: {err}"}, status=400)
+
 async def index(request):
     return web.FileResponse(WWW / "index.html")
 
 app = web.Application()
 app.router.add_get("/", index)
 app.router.add_get("/api/registry", registry)
+app.router.add_get("/api/mappings", get_mappings)
+app.router.add_post("/api/mappings", save_mappings)
 app.router.add_get("/api/{path:.*}", proxy_get)
 app.router.add_post("/service/{domain}/{service}", call_service)
 app.router.add_static("/static/", WWW, show_index=False)
