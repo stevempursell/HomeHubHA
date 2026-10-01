@@ -23,6 +23,3 @@ configuration:
   enable_source_updater:
     name: Enable source updater
     description: Show the maintenance control that syncs the local Home Hub source to the GitHub main branch.
-  maintenance_user:
-    name: Maintenance user
-    description: Reserved for restricting maintenance tools to a Home Assistant username.
