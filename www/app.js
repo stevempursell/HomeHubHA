@@ -2,6 +2,7 @@ let states = [];
 let registry = null;
 let rooms = new Map();
 let selectedRoomId = null;
+let manualMappings = { entity_rooms: {} };
 
 const $ = (id) => document.getElementById(id);
 
@@ -54,55 +55,77 @@ function stateById(entityId) {
   return states.find(s => s.entity_id === entityId);
 }
 
-function buildRoomModel() {
-  rooms = new Map(ROOM_DEFS.map(def => [def.id, { ...def, areaNames: [], lights: [] }]));
-  if (!registry) return;
+function registryEntityById(entityId) {
+  return registry?.entities?.entities?.find(ent => ent.ei === entityId) || null;
+}
 
-  const areas = registry.areas || [];
-  const areaById = new Map(areas.map(a => [a.area_id || a.id, a]));
-  const deviceById = new Map((registry.devices || []).map(d => [d.id, d]));
-  const regEntities = registry.entities?.entities || [];
+function autoRoomIdsForEntity(entityId) {
+  if (!registry) return [];
 
-  const addLight = (roomId, entityId, areaName = null) => {
-    const room = rooms.get(roomId);
-    if (!room) return;
-    if (areaName && !room.areaNames.includes(areaName)) room.areaNames.push(areaName);
-    if (!room.lights.includes(entityId)) room.lights.push(entityId);
-  };
+  const ent = registryEntityById(entityId);
+  const live = stateById(entityId);
+  const displayName = norm(live ? friendly(live) : ent?.en || entityId);
+  const matches = new Set();
 
-  for (const ent of regEntities) {
-    if (!ent.ei?.startsWith("light.")) continue;
-    if (ent.hb) continue;
-
-    const live = stateById(ent.ei);
-    const displayName = norm(live ? friendly(live) : ent.en || ent.ei);
+  if (ent) {
+    const areaById = new Map((registry.areas || []).map(a => [a.area_id || a.id, a]));
+    const deviceById = new Map((registry.devices || []).map(d => [d.id, d]));
 
     let areaId = ent.ai || null;
     if (!areaId && ent.di) areaId = deviceById.get(ent.di)?.area_id || null;
     const area = areaId ? areaById.get(areaId) : null;
-
-    const matchedRoomIds = new Set();
-
     const areaZone = area ? zoneForName(area.name) : null;
-    if (areaZone) matchedRoomIds.add(areaZone.id);
+    if (areaZone) matches.add(areaZone.id);
+  }
 
-    for (const [roomId, patterns] of Object.entries(LIGHT_RULES)) {
-      if (patterns.some(pattern => displayName.includes(norm(pattern)))) {
-        matchedRoomIds.add(roomId);
-      }
+  for (const [roomId, patterns] of Object.entries(LIGHT_RULES)) {
+    if (patterns.some(pattern => displayName.includes(norm(pattern)))) {
+      matches.add(roomId);
+    }
+  }
+
+  if (!matches.size) {
+    const nameZone = zoneForName(displayName);
+    if (nameZone) matches.add(nameZone.id);
+  }
+
+  return [...matches];
+}
+
+function effectiveRoomIds(entityId) {
+  const mapping = manualMappings.entity_rooms || {};
+  if (Object.prototype.hasOwnProperty.call(mapping, entityId)) {
+    return mapping[entityId];
+  }
+  return autoRoomIdsForEntity(entityId);
+}
+
+function buildRoomModel() {
+  rooms = new Map(ROOM_DEFS.map(def => [def.id, { ...def, areaNames: [], lights: [] }]));
+  if (!registry) return;
+
+  const areaById = new Map((registry.areas || []).map(a => [a.area_id || a.id, a]));
+  const deviceById = new Map((registry.devices || []).map(d => [d.id, d]));
+
+  for (const entity of states) {
+    if (!entity.entity_id.startsWith("light.")) continue;
+
+    const ent = registryEntityById(entity.entity_id);
+    let areaName = null;
+    if (ent) {
+      let areaId = ent.ai || null;
+      if (!areaId && ent.di) areaId = deviceById.get(ent.di)?.area_id || null;
+      areaName = areaId ? areaById.get(areaId)?.name || null : null;
     }
 
-    if (!matchedRoomIds.size) {
-      const nameZone = zoneForName(displayName);
-      if (nameZone) matchedRoomIds.add(nameZone.id);
-    }
-
-    for (const roomId of matchedRoomIds) {
-      addLight(roomId, ent.ei, area?.name || null);
+    for (const roomId of effectiveRoomIds(entity.entity_id)) {
+      const room = rooms.get(roomId);
+      if (!room) continue;
+      if (areaName && !room.areaNames.includes(areaName)) room.areaNames.push(areaName);
+      if (!room.lights.includes(entity.entity_id)) room.lights.push(entity.entity_id);
     }
   }
 }
-
 function roomStats(room) {
   const live = room.lights.map(stateById).filter(Boolean);
   return {
@@ -271,6 +294,83 @@ function renderEntityBrowser() {
   }
 }
 
+function populateManagerRooms() {
+  const select = $("managerRoom");
+  if (!select) return;
+  const current = select.value;
+  select.innerHTML = ROOM_DEFS.map(room =>
+    `<option value="${room.id}">${room.label}</option>`
+  ).join("");
+  if (current && ROOM_DEFS.some(room => room.id === current)) select.value = current;
+}
+
+function renderManager() {
+  const holder = $("managerEntities");
+  const roomSelect = $("managerRoom");
+  if (!holder || !roomSelect) return;
+
+  const roomId = roomSelect.value || ROOM_DEFS[0].id;
+  const q = $("managerSearch").value.trim().toLowerCase();
+  const domain = $("managerDomain").value;
+
+  const filtered = states
+    .filter(entity => !domain || entity.entity_id.startsWith(domain + "."))
+    .filter(entity => !q || entity.entity_id.toLowerCase().includes(q) || friendly(entity).toLowerCase().includes(q))
+    .sort((a, b) => friendly(a).localeCompare(friendly(b)))
+    .slice(0, 300);
+
+  holder.innerHTML = "";
+  for (const entity of filtered) {
+    const assigned = effectiveRoomIds(entity.entity_id).includes(roomId);
+    const manual = Object.prototype.hasOwnProperty.call(manualMappings.entity_rooms || {}, entity.entity_id);
+
+    const label = document.createElement("label");
+    label.className = "manager-row";
+    label.innerHTML = `
+      <input type="checkbox" ${assigned ? "checked" : ""} />
+      <span class="manager-entity">
+        <strong>${friendly(entity)}</strong>
+        <small>${entity.entity_id}</small>
+      </span>
+      <span class="mapping-source">${manual ? "manual" : "auto"}</span>
+    `;
+
+    const checkbox = label.querySelector("input");
+    checkbox.addEventListener("change", () => {
+      const currentRooms = new Set(effectiveRoomIds(entity.entity_id));
+      if (checkbox.checked) currentRooms.add(roomId);
+      else currentRooms.delete(roomId);
+      manualMappings.entity_rooms[entity.entity_id] = [...currentRooms];
+      renderManager();
+      buildRoomModel();
+      renderFloorplan();
+    });
+
+    holder.appendChild(label);
+  }
+
+  $("managerStatus").textContent = `${filtered.length} entities shown • changes are local until saved`;
+}
+
+async function loadMappings() {
+  const response = await fetch("api/mappings");
+  if (!response.ok) throw new Error(`Mappings API returned ${response.status}`);
+  manualMappings = await response.json();
+  if (!manualMappings.entity_rooms) manualMappings.entity_rooms = {};
+}
+
+async function saveMappings() {
+  const response = await fetch("api/mappings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(manualMappings),
+  });
+  if (!response.ok) throw new Error(`Could not save mappings: ${response.status}`);
+  $("managerStatus").textContent = "Assignments saved.";
+  buildRoomModel();
+  renderFloorplan();
+}
+
 function showError(err) {
   console.error(err);
   $("status").textContent = `Error: ${err.message}`;
@@ -300,9 +400,12 @@ async function init() {
   try {
     await loadStates();
     await loadRegistry();
+    await loadMappings();
+    populateManagerRooms();
     buildRoomModel();
     renderFloorplan();
     renderEntityBrowser();
+    renderManager();
   } catch (err) {
     showError(err);
   }
@@ -310,6 +413,10 @@ async function init() {
 
 $("refresh").addEventListener("click", () => init());
 $("search").addEventListener("input", renderEntityBrowser);
+$("managerRoom").addEventListener("change", renderManager);
+$("managerSearch").addEventListener("input", renderManager);
+$("managerDomain").addEventListener("change", renderManager);
+$("saveMappings").addEventListener("click", () => saveMappings().catch(showError));
 
 init();
 setInterval(() => loadStates(false).catch(showError), 5000);
