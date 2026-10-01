@@ -1,5 +1,5 @@
 name: "Home Hub"
-version: "0.3.0"
+version: "0.3.1"
 slug: "home_hub"
 init: false
 description: "Local custom Home Assistant dashboard and control surface"
