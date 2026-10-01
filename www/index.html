@@ -16,7 +16,7 @@
       <div id="status" class="status">Connecting…</div>
     </header>
 
-    <section class="alarm-card" aria-label="Alarm panel controls">
+    <section id="alarmCard" class="alarm-card" aria-label="Alarm panel controls">
       <div class="alarm-info">
         <div class="eyebrow">ALARM PANEL</div>
         <div class="alarm-name" id="alarmName">Security</div>
@@ -82,13 +82,28 @@
       </div>
     </details>
 
-    <details>
+    <details id="diagnosticsPanel">
       <summary>Diagnostics / entity browser</summary>
       <div class="section-title" style="margin-top:14px">
         <h2>Entities</h2>
         <input id="search" placeholder="Search entity or friendly name…" />
       </div>
       <div id="entities" class="entity-list"></div>
+    </details>
+
+    <details id="maintenancePanel" hidden>
+      <summary>Maintenance</summary>
+      <div class="manager-panel">
+        <div class="section-title manager-head">
+          <div>
+            <div class="eyebrow">SOURCE UPDATE</div>
+            <h2>Home Hub updater</h2>
+          </div>
+          <button id="sourceUpdate" type="button">Update source</button>
+        </div>
+        <p class="room-note">Syncs the local Home Hub source to the current main branch. After it completes, open Settings → Apps → Home Hub and choose Update.</p>
+        <div id="sourceUpdateStatus" class="room-note"></div>
+      </div>
     </details>
   </main>
 
