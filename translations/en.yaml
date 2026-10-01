@@ -1,0 +1,28 @@
+configuration:
+  show_alarm_controls:
+    name: Show alarm controls
+    description: Show the alarm control card at the top of Home Hub.
+  show_room_manager:
+    name: Show room assignment manager
+    description: Show the entity-to-room assignment tools in Home Hub.
+  show_diagnostics:
+    name: Show diagnostics
+    description: Show the diagnostics and entity browser section.
+  auto_map_areas:
+    name: Auto-map Home Assistant areas
+    description: Automatically match entities to Home Hub rooms using Home Assistant area names.
+  auto_map_names:
+    name: Auto-map entity names
+    description: Automatically match entities to rooms using friendly names and Home Hub naming rules.
+  show_unavailable_entities:
+    name: Show unavailable entities
+    description: Include unavailable entities in the diagnostics browser.
+  alarm_entity:
+    name: Alarm entity
+    description: Entity ID of the alarm panel to use. Leave blank to use the first alarm_control_panel entity found.
+  enable_source_updater:
+    name: Enable source updater
+    description: Show the maintenance control that syncs the local Home Hub source to the GitHub main branch.
+  maintenance_user:
+    name: Maintenance user
+    description: Reserved for restricting maintenance tools to a Home Assistant username.
