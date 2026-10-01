@@ -3,6 +3,16 @@ let registry = null;
 let rooms = new Map();
 let selectedRoomId = null;
 let manualMappings = { entity_rooms: {} };
+let appOptions = {
+  show_alarm_controls: true,
+  show_room_manager: true,
+  show_diagnostics: false,
+  auto_map_areas: true,
+  auto_map_names: true,
+  show_unavailable_entities: false,
+  alarm_entity: "",
+  enable_source_updater: false,
+};
 
 const $ = (id) => document.getElementById(id);
 
@@ -67,7 +77,7 @@ function autoRoomIdsForEntity(entityId) {
   const displayName = norm(live ? friendly(live) : ent?.en || entityId);
   const matches = new Set();
 
-  if (ent) {
+  if (ent && appOptions.auto_map_areas) {
     const areaById = new Map((registry.areas || []).map(a => [a.area_id || a.id, a]));
     const deviceById = new Map((registry.devices || []).map(d => [d.id, d]));
 
@@ -78,15 +88,17 @@ function autoRoomIdsForEntity(entityId) {
     if (areaZone) matches.add(areaZone.id);
   }
 
-  for (const [roomId, patterns] of Object.entries(LIGHT_RULES)) {
-    if (patterns.some(pattern => displayName.includes(norm(pattern)))) {
-      matches.add(roomId);
+  if (appOptions.auto_map_names) {
+    for (const [roomId, patterns] of Object.entries(LIGHT_RULES)) {
+      if (patterns.some(pattern => displayName.includes(norm(pattern)))) {
+        matches.add(roomId);
+      }
     }
-  }
 
-  if (!matches.size) {
-    const nameZone = zoneForName(displayName);
-    if (nameZone) matches.add(nameZone.id);
+    if (!matches.size) {
+      const nameZone = zoneForName(displayName);
+      if (nameZone) matches.add(nameZone.id);
+    }
   }
 
   return [...matches];
@@ -269,6 +281,10 @@ function renderUnmappedAreas() {
 }
 
 function alarmEntity() {
+  if (appOptions.alarm_entity) {
+    const configured = states.find(entity => entity.entity_id === appOptions.alarm_entity);
+    if (configured) return configured;
+  }
   return states.find(entity => entity.entity_id.startsWith("alarm_control_panel.")) || null;
 }
 
@@ -335,6 +351,7 @@ async function callAlarm(service) {
 function renderEntityBrowser() {
   const q = $("search").value.trim().toLowerCase();
   const filtered = states
+    .filter(s => appOptions.show_unavailable_entities || s.state !== "unavailable")
     .filter(s => !q || s.entity_id.toLowerCase().includes(q) || friendly(s).toLowerCase().includes(q))
     .sort((a, b) => friendly(a).localeCompare(friendly(b)))
     .slice(0, 150);
@@ -413,6 +430,43 @@ function renderManager() {
   $("managerStatus").textContent = `${filtered.length} entities shown • changes are local until saved`;
 }
 
+async function loadOptions() {
+  const response = await fetch("api/options");
+  if (!response.ok) throw new Error(`Options API returned ${response.status}`);
+  appOptions = { ...appOptions, ...(await response.json()) };
+  applyOptions();
+}
+
+function applyOptions() {
+  const alarmCard = $("alarmCard");
+  const roomManager = $("roomManager");
+  const diagnostics = $("diagnosticsPanel");
+  const maintenance = $("maintenancePanel");
+  if (alarmCard) alarmCard.hidden = !appOptions.show_alarm_controls;
+  if (roomManager) roomManager.hidden = !appOptions.show_room_manager;
+  if (diagnostics) diagnostics.hidden = !appOptions.show_diagnostics;
+  if (maintenance) maintenance.hidden = !appOptions.enable_source_updater;
+}
+
+async function updateSource() {
+  const button = $("sourceUpdate");
+  const status = $("sourceUpdateStatus");
+  if (!button || !status) return;
+  button.disabled = true;
+  status.textContent = "Updating local source…";
+  try {
+    const response = await fetch("api/source/update", { method: "POST" });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || `Update failed: ${response.status}`);
+    status.textContent = `${result.message || "Source updated."}${result.commit ? " • " + result.commit : ""} Now open Settings → Apps → Home Hub and choose Update.`;
+  } catch (err) {
+    status.textContent = err.message;
+    throw err;
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function loadMappings() {
   const response = await fetch("api/mappings");
   if (!response.ok) throw new Error(`Mappings API returned ${response.status}`);
@@ -458,6 +512,7 @@ async function loadStates(updateStatus = true) {
 
 async function init() {
   try {
+    await loadOptions();
     await loadStates();
     await loadRegistry();
     await loadMappings();
@@ -479,6 +534,7 @@ $("managerDomain").addEventListener("change", renderManager);
 $("saveMappings").addEventListener("click", () => saveMappings().catch(showError));
 $("armHome").addEventListener("click", () => callAlarm("alarm_arm_home").catch(showError));
 $("armOff").addEventListener("click", () => callAlarm("alarm_disarm").catch(showError));
+$("sourceUpdate")?.addEventListener("click", () => updateSource().catch(showError));
 
 init();
 setInterval(() => loadStates(false).catch(showError), 5000);
