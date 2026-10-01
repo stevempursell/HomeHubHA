@@ -45,6 +45,37 @@
       <div id="unmappedAreas" class="area-mapping"></div>
     </section>
 
+
+    <details id="roomManager">
+      <summary>Manage room assignments</summary>
+      <div class="manager-panel">
+        <div class="section-title manager-head">
+          <div>
+            <div class="eyebrow">ROOM MAPPING</div>
+            <h2>Assign entities</h2>
+          </div>
+          <button id="saveMappings" type="button">Save assignments</button>
+        </div>
+        <p class="room-note">Manual assignments override automatic matching. You can assign lights now, and other entity types for future room views.</p>
+        <div class="manager-toolbar">
+          <select id="managerRoom" aria-label="Choose room"></select>
+          <input id="managerSearch" placeholder="Search entities…" />
+          <select id="managerDomain" aria-label="Filter entity type">
+            <option value="">All entities</option>
+            <option value="light">Lights</option>
+            <option value="switch">Switches</option>
+            <option value="fan">Fans</option>
+            <option value="climate">Climate</option>
+            <option value="media_player">Media players</option>
+            <option value="binary_sensor">Binary sensors</option>
+            <option value="sensor">Sensors</option>
+          </select>
+        </div>
+        <div id="managerStatus" class="room-note"></div>
+        <div id="managerEntities" class="manager-list"></div>
+      </div>
+    </details>
+
     <details>
       <summary>Diagnostics / entity browser</summary>
       <div class="section-title" style="margin-top:14px">
