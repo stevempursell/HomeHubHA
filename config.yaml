@@ -1,5 +1,5 @@
 name: "Home Hub"
-version: "0.3.2"
+version: "0.4.0"
 slug: "home_hub"
 init: false
 description: "Local custom Home Assistant dashboard and control surface"
@@ -14,3 +14,26 @@ panel_icon: mdi:home-automation
 panel_title: Home Hub
 panel_admin: false
 homeassistant_api: true
+map:
+  - type: addons
+    read_only: false
+options:
+  show_alarm_controls: true
+  show_room_manager: true
+  show_diagnostics: false
+  auto_map_areas: true
+  auto_map_names: true
+  show_unavailable_entities: false
+  alarm_entity: ""
+  enable_source_updater: false
+  maintenance_user: ""
+schema:
+  show_alarm_controls: bool
+  show_room_manager: bool
+  show_diagnostics: bool
+  auto_map_areas: bool
+  auto_map_names: bool
+  show_unavailable_entities: bool
+  alarm_entity: str
+  enable_source_updater: bool
+  maintenance_user: str
