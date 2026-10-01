@@ -13,11 +13,19 @@ const ROOM_DEFS = [
   { id: "kitchen", label: "Kitchen", aliases: ["kitchen"], x: 41, y: 24, w: 23, h: 15 },
   { id: "foyer", label: "Foyer", aliases: ["foyer", "entry", "entryway"], x: 3, y: 36, w: 34, h: 10 },
   { id: "study", label: "Open Study", aliases: ["open study", "study", "office"], x: 20, y: 43, w: 30, h: 13 },
-  { id: "bed2", label: "Bedroom 2", aliases: ["bedroom 2", "bedroom2", "bed 2"], x: 67, y: 35, w: 29, h: 13 },
+  { id: "bed2", label: "Bennett's Room", aliases: ["bedroom 2", "bedroom2", "bed 2", "bennett", "bennetts room", "bennett room"], x: 67, y: 35, w: 29, h: 13 },
   { id: "laundry", label: "Laundry", aliases: ["laundry", "laundry room"], x: 67, y: 47, w: 28, h: 7 },
-  { id: "bed3", label: "Bedroom 3", aliases: ["bedroom 3", "bedroom3", "bed 3", "parker's room", "parker room"], x: 16, y: 57, w: 28, h: 13 },
+  { id: "bed3", label: "Parker's Room", aliases: ["bedroom 3", "bedroom3", "bed 3", "parker", "parkers room", "parker room"], x: 16, y: 57, w: 28, h: 13 },
   { id: "garage", label: "Garage", aliases: ["garage", "2-car garage", "2 car garage"], x: 44, y: 57, w: 52, h: 22 },
 ];
+
+const LIGHT_RULES = {
+  great: ["living room", "fan light", "ceiling fan light"],
+  nook: ["island"],
+  kitchen: ["kitchen", "big light", "big lights", "island", "cabinet", "cabinets"],
+  bed2: ["bennett"],
+  bed3: ["parker"],
+};
 
 function friendly(s) {
   return s.attributes?.friendly_name || s.entity_id;
@@ -55,25 +63,43 @@ function buildRoomModel() {
   const deviceById = new Map((registry.devices || []).map(d => [d.id, d]));
   const regEntities = registry.entities?.entities || [];
 
+  const addLight = (roomId, entityId, areaName = null) => {
+    const room = rooms.get(roomId);
+    if (!room) return;
+    if (areaName && !room.areaNames.includes(areaName)) room.areaNames.push(areaName);
+    if (!room.lights.includes(entityId)) room.lights.push(entityId);
+  };
+
   for (const ent of regEntities) {
     if (!ent.ei?.startsWith("light.")) continue;
     if (ent.hb) continue;
 
+    const live = stateById(ent.ei);
+    const displayName = norm(live ? friendly(live) : ent.en || ent.ei);
+
     let areaId = ent.ai || null;
     if (!areaId && ent.di) areaId = deviceById.get(ent.di)?.area_id || null;
-
     const area = areaId ? areaById.get(areaId) : null;
-    let zone = area ? zoneForName(area.name) : null;
 
-    if (!zone) {
-      const live = stateById(ent.ei);
-      zone = zoneForName(live ? friendly(live) : ent.en || ent.ei);
+    const matchedRoomIds = new Set();
+
+    const areaZone = area ? zoneForName(area.name) : null;
+    if (areaZone) matchedRoomIds.add(areaZone.id);
+
+    for (const [roomId, patterns] of Object.entries(LIGHT_RULES)) {
+      if (patterns.some(pattern => displayName.includes(norm(pattern)))) {
+        matchedRoomIds.add(roomId);
+      }
     }
 
-    if (!zone) continue;
-    const room = rooms.get(zone.id);
-    if (area?.name && !room.areaNames.includes(area.name)) room.areaNames.push(area.name);
-    if (!room.lights.includes(ent.ei)) room.lights.push(ent.ei);
+    if (!matchedRoomIds.size) {
+      const nameZone = zoneForName(displayName);
+      if (nameZone) matchedRoomIds.add(nameZone.id);
+    }
+
+    for (const roomId of matchedRoomIds) {
+      addLight(roomId, ent.ei, area?.name || null);
+    }
   }
 }
 
