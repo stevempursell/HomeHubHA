@@ -2,8 +2,7 @@ import json
 import os
 import subprocess
 from pathlib import Path
-
-from aiohttp import ClientSession, ClientTimeout, web
+from aiohttp import web, ClientSession, ClientTimeout
 
 PORT = 8099
 HA_API = "http://supervisor/core/api"
@@ -11,21 +10,9 @@ HA_WS = "ws://supervisor/core/websocket"
 TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 WWW = Path("/app/www")
 DATA = Path("/data")
-MAPPINGS_FILE = DATA / "room_mappings.json"
 OPTIONS_FILE = DATA / "options.json"
+MAPPINGS_FILE = DATA / "room_mappings.json"
 ADDONS_ROOT = Path("/addons")
-
-DEFAULT_OPTIONS = {
-    "show_alarm_controls": True,
-    "show_room_manager": True,
-    "show_diagnostics": False,
-    "auto_map_areas": True,
-    "auto_map_names": True,
-    "show_unavailable_entities": False,
-    "alarm_entity": "",
-    "enable_source_updater": False,
-    "maintenance_user": "",
-}
 
 
 def ha_headers():
@@ -35,52 +22,30 @@ def ha_headers():
     }
 
 
-def load_options():
-    options = dict(DEFAULT_OPTIONS)
+def read_options():
+    defaults = {
+        "show_alarm_controls": True,
+        "show_room_manager": True,
+        "show_diagnostics": False,
+        "auto_map_areas": True,
+        "auto_map_names": True,
+        "show_unavailable_entities": False,
+        "alarm_entity": "",
+        "enable_source_updater": False,
+        "maintenance_user": "",
+    }
     try:
         if OPTIONS_FILE.exists():
-            loaded = json.loads(OPTIONS_FILE.read_text())
-            if isinstance(loaded, dict):
-                options.update(loaded)
+            saved = json.loads(OPTIONS_FILE.read_text())
+            if isinstance(saved, dict):
+                defaults.update(saved)
     except Exception:
         pass
-    return options
+    return defaults
 
 
-def find_source_repo():
-    candidates = [
-        ADDONS_ROOT / "home_hub",
-        ADDONS_ROOT / "home-hub",
-        ADDONS_ROOT / "HomeHubHA",
-    ]
-
-    if ADDONS_ROOT.exists():
-        candidates.extend(path for path in ADDONS_ROOT.iterdir() if path.is_dir())
-
-    seen = set()
-    for candidate in candidates:
-        try:
-            resolved = candidate.resolve()
-        except OSError:
-            continue
-        if resolved in seen:
-            continue
-        seen.add(resolved)
-
-        git_dir = resolved / ".git"
-        config_file = resolved / "config.yaml"
-        if not git_dir.exists() or not config_file.exists():
-            continue
-
-        try:
-            config_text = config_file.read_text(errors="ignore")
-        except OSError:
-            continue
-
-        if 'slug: "home_hub"' in config_text or "slug: home_hub" in config_text:
-            return resolved
-
-    return None
+async def options(request):
+    return web.json_response(read_options())
 
 
 async def proxy_get(request):
@@ -118,10 +83,7 @@ async def registry(request):
             await ws.send_json({"type": "auth", "access_token": TOKEN})
             auth = await ws.receive_json()
             if auth.get("type") != "auth_ok":
-                return web.json_response(
-                    {"error": "Home Assistant WebSocket authentication failed"},
-                    status=401,
-                )
+                return web.json_response({"error": "Home Assistant WebSocket authentication failed"}, status=401)
 
             commands = [
                 (1, "config/area_registry/list"),
@@ -139,21 +101,16 @@ async def registry(request):
 
             for command_id, label in [(1, "areas"), (2, "devices"), (3, "entities")]:
                 if not results[command_id].get("success"):
-                    return web.json_response(
-                        {
-                            "error": f"Home Assistant registry request failed: {label}",
-                            "detail": results[command_id].get("error"),
-                        },
-                        status=502,
-                    )
+                    return web.json_response({
+                        "error": f"Home Assistant registry request failed: {label}",
+                        "detail": results[command_id].get("error"),
+                    }, status=502)
 
-            return web.json_response(
-                {
-                    "areas": results[1]["result"],
-                    "devices": results[2]["result"],
-                    "entities": results[3]["result"],
-                }
-            )
+            return web.json_response({
+                "areas": results[1]["result"],
+                "devices": results[2]["result"],
+                "entities": results[3]["result"],
+            })
 
 
 async def get_mappings(request):
@@ -173,114 +130,88 @@ async def save_mappings(request):
         entity_rooms = payload.get("entity_rooms", {})
         if not isinstance(entity_rooms, dict):
             raise ValueError("entity_rooms must be an object")
-
         clean = {}
         for entity_id, room_ids in entity_rooms.items():
             if not isinstance(entity_id, str) or not isinstance(room_ids, list):
                 continue
             clean[entity_id] = [str(room_id) for room_id in room_ids]
-
-        MAPPINGS_FILE.write_text(
-            json.dumps({"entity_rooms": clean}, indent=2, sort_keys=True)
-        )
+        MAPPINGS_FILE.write_text(json.dumps({"entity_rooms": clean}, indent=2, sort_keys=True))
         return web.json_response({"ok": True, "entity_rooms": clean})
     except Exception as err:
         return web.json_response({"error": f"Could not save mappings: {err}"}, status=400)
 
 
-async def get_options(request):
-    return web.json_response(load_options())
+def find_source_repo():
+    if not ADDONS_ROOT.exists():
+        return None
+    candidates = []
+    for child in ADDONS_ROOT.iterdir():
+        if child.is_dir():
+            candidates.append(child)
+            try:
+                candidates.extend(p for p in child.iterdir() if p.is_dir())
+            except OSError:
+                pass
+    for path in candidates:
+        cfg = path / "config.yaml"
+        git = path / ".git"
+        if not cfg.exists() or not git.exists():
+            continue
+        try:
+            text = cfg.read_text()
+        except OSError:
+            continue
+        if 'slug: "home_hub"' in text or "slug: home_hub" in text:
+            return path
+    return None
 
 
-async def get_session(request):
-    return web.json_response(
-        {
-            "user_id": request.headers.get("X-Remote-User-Id", ""),
-            "user_name": request.headers.get("X-Remote-User-Name", ""),
-            "display_name": request.headers.get("X-Remote-User-Display-Name", ""),
-        }
-    )
+async def source_status(request):
+    opts = read_options()
+    repo = find_source_repo()
+    return web.json_response({
+        "enabled": bool(opts.get("enable_source_updater")),
+        "repo_found": bool(repo),
+        "repo_path": str(repo) if repo else None,
+    })
 
 
-async def update_source(request):
-    options = load_options()
-    if not options.get("enable_source_updater"):
-        return web.json_response(
-            {"error": "Source updater is disabled in Home Hub configuration."},
-            status=403,
-        )
-
-    maintenance_user = str(options.get("maintenance_user", "")).strip()
-    remote_user = request.headers.get("X-Remote-User-Name", "").strip()
-
-    if not maintenance_user:
-        return web.json_response(
-            {"error": "Set Maintenance user in Home Hub configuration first."},
-            status=403,
-        )
-
-    if remote_user != maintenance_user:
-        return web.json_response(
-            {"error": "This Home Assistant user is not allowed to update Home Hub."},
-            status=403,
-        )
+async def source_update(request):
+    opts = read_options()
+    if not opts.get("enable_source_updater"):
+        return web.json_response({"error": "Source updater is disabled in Home Hub Configuration."}, status=403)
 
     repo = find_source_repo()
     if not repo:
-        return web.json_response(
-            {"error": "Could not find the Home Hub source repository under /addons."},
-            status=500,
-        )
+        return web.json_response({"error": "Could not locate the Home Hub git checkout under /addons."}, status=404)
 
     try:
-        subprocess.run(
-            ["git", "config", "--global", "--add", "safe.directory", str(repo)],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-
-        commands = [
+        fetch = subprocess.run(
             ["git", "-C", str(repo), "fetch", "origin"],
-            ["git", "-C", str(repo), "reset", "--hard", "origin/main"],
-            ["git", "-C", str(repo), "clean", "-fd"],
-        ]
+            capture_output=True, text=True, timeout=45
+        )
+        if fetch.returncode != 0:
+            raise RuntimeError(fetch.stderr.strip() or fetch.stdout.strip() or "git fetch failed")
 
-        output = []
-        for command in commands:
-            result = subprocess.run(
-                command,
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=45,
-            )
-            text = (result.stdout or result.stderr).strip()
-            if text:
-                output.append(text)
+        reset = subprocess.run(
+            ["git", "-C", str(repo), "reset", "--hard", "origin/main"],
+            capture_output=True, text=True, timeout=45
+        )
+        if reset.returncode != 0:
+            raise RuntimeError(reset.stderr.strip() or reset.stdout.strip() or "git reset failed")
 
         head = subprocess.run(
             ["git", "-C", str(repo), "rev-parse", "--short", "HEAD"],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        ).stdout.strip()
-
-        return web.json_response(
-            {
-                "ok": True,
-                "head": head,
-                "message": "Source updated. Home Assistant should now offer Update if the version changed.",
-                "output": output,
-            }
+            capture_output=True, text=True, timeout=10
         )
-    except subprocess.CalledProcessError as err:
-        detail = (err.stderr or err.stdout or str(err)).strip()
-        return web.json_response({"error": f"Git update failed: {detail}"}, status=500)
+        return web.json_response({
+            "ok": True,
+            "message": reset.stdout.strip() or "Home Hub source updated.",
+            "commit": head.stdout.strip() if head.returncode == 0 else None,
+            "next_step": "Open Settings > Apps > Home Hub and choose Update.",
+        })
     except Exception as err:
-        return web.json_response({"error": f"Git update failed: {err}"}, status=500)
+        return web.json_response({"error": str(err)}, status=500)
 
 
 async def index(request):
@@ -289,12 +220,12 @@ async def index(request):
 
 app = web.Application()
 app.router.add_get("/", index)
+app.router.add_get("/api/options", options)
 app.router.add_get("/api/registry", registry)
 app.router.add_get("/api/mappings", get_mappings)
 app.router.add_post("/api/mappings", save_mappings)
-app.router.add_get("/api/options", get_options)
-app.router.add_get("/api/session", get_session)
-app.router.add_post("/api/update-source", update_source)
+app.router.add_get("/api/source/status", source_status)
+app.router.add_post("/api/source/update", source_update)
 app.router.add_get("/api/{path:.*}", proxy_get)
 app.router.add_post("/service/{domain}/{service}", call_service)
 app.router.add_static("/static/", WWW, show_index=False)
