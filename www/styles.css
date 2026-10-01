@@ -1,4 +1,4 @@
-:root {
+[hidden] { display: none !important; }\n\n:root {
   color-scheme: dark;
   --bg: #0b0d10;
   --panel: #15191f;
@@ -376,7 +376,8 @@ summary:focus-visible {
 
 .manager-toolbar select,
 .manager-toolbar input,
-#saveMappings {
+#saveMappings,
+#sourceUpdate {
   min-height: 44px;
   background: var(--panel2);
   color: var(--text);
