@@ -26,7 +26,6 @@ options:
   show_unavailable_entities: false
   alarm_entity: ""
   enable_source_updater: false
-  maintenance_user: ""
 schema:
   show_alarm_controls: bool
   show_room_manager: bool
@@ -36,4 +35,3 @@ schema:
   show_unavailable_entities: bool
   alarm_entity: str
   enable_source_updater: bool
-  maintenance_user: str
