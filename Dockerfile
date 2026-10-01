@@ -1,6 +1,7 @@
 FROM python:3.13-alpine
 
-RUN pip install --no-cache-dir aiohttp
+RUN apk add --no-cache git \
+    && pip install --no-cache-dir aiohttp
 
 WORKDIR /app
 COPY server.py /app/server.py
